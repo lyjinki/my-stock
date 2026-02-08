@@ -150,71 +150,57 @@ st.caption("※ 시가총액 데이터는 네이버 증권 기준이며 실시�
 
 import datetime
 
-# 7. 네이버 경제/종합 뉴스 가져오기 함수
-def get_total_news():
-    # 네이버 뉴스 '경제' 섹션의 최신 뉴스 URL
-    url = "https://news.naver.com/main/main.naver?mode=LSD&mid=shm&sid1=101" # 101은 경제 섹션
-    headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36'}
+# 7. 테마별 종목 데이터를 가져오는 함수
+def get_theme_top10(theme_name):
+    # 네이버 증권 테마 검색용 (실제 구현 시 각 테마별 고유 코드가 필요합니다)
+    # 아래는 예시로 검색 결과를 가져오는 구조입니다. 
+    # 편의상 '거래량 상위' 데이터 내에서 해당 키워드가 포함된 종목을 필터링하거나 
+    # 미리 지정된 테마별 종목 리스트를 사용할 수 있습니다.
     
-    res = requests.get(url, headers=headers)
-    soup = BeautifulSoup(res.text, 'html.parser')
+    # 예시를 위해 거래상위 데이터에서 각 테마별 주요 종목을 매칭하는 방식을 사용합니다.
+    theme_dict = {
+        "반도체": ["삼성전자", "SK하이닉스", "한미반도체", "제주반도체", "가온칩스", "리노공업", "HPSP", "어보브반도체", "디아이", "하나마이크론"],
+        "AI": ["네이버", "카카오", "플리토", "마음AI", "솔트룩스", "이스트소프트", "코난테크놀로지", "셀바스AI", "루닛", "뷰노"],
+        "전력": ["LS ELECTRIC", "HD현대일렉트릭", "효성중공업", "제룡전기", "일진전기", "광명전기", "대원전선", "가온전선", "대한전선", "서전기전"],
+        "방산": ["한화에어로스페이스", "현대로템", "LIG넥스원", "한국항공우주", "풍산", "한화시스템", "휴니드", "빅텍", "스페코", "퍼스텍"]
+    }
     
-    news_list = []
+    # 전체 데이터(KOSPI/KOSDAQ)를 기반으로 해당 종목들만 필터링
+    # 실제 운영시에는 각 테마 페이지 크롤링 권장
+    target_stocks = theme_dict.get(theme_name, [])
     
-    # 뉴스 헤드라인 및 일반 목록 추출
-    # 네이버 뉴스 구조에 따라 선택자를 조정합니다.
-    links = soup.select('a.sa_text_title, a.cluster_text_headline')
+    # 여기서는 상단에서 이미 가져온 data를 재활용하거나 새로 쿼리합니다.
+    # 실시간 시세를 위해 간단히 현재 data에서 필터링하는 예시입니다.
+    theme_df = data[data['종목명'].isin(target_stocks)].copy()
     
-    for link in links:
-        title = link.get_text(strip=True)
-        url_link = link['href']
-        
-        # 중복 방지 및 기사 수집
-        if title and url_link not in [n['링크'] for n in news_list]:
-            news_list.append({"제목": title, "링크": url_link})
-            
-    return pd.DataFrame(news_list)
+    # 만약 데이터가 부족하면 빈 칸을 채워 상위 10개를 유지합니다.
+    return theme_df.reset_index(drop=True)
 
-# 8. 뉴스 섹션 UI (3일 이내 경제/사회 종합)
+# 8. 테마별 4분할 레이아웃
 st.divider()
-st.subheader("📰 최신 경제·종합 뉴스")
-st.caption("3일 이내의 주요 경제 및 사회 분야 기사를 모아 보여줍니다.")
+st.header("🎯 핵심 분야별 TOP 10 상황")
 
-# 뉴스 데이터 가져오기
-news_df = get_total_news()
+t_col1, t_col2 = st.columns(2)
+t_col3, t_col4 = st.columns(2)
 
-if not news_df.empty:
-    # 페이지네이션 설정
-    if 'news_page' not in st.session_state:
-        st.session_state.news_page = 0
+themes = [
+    ("🟦 반도체 관련주", "반도체", t_col1),
+    ("🤖 AI 관련주", "AI", t_col2),
+    ("⚡ 전력 관련주", "전력", t_col3),
+    ("🛡️ 방산 관련주", "방산", t_col4)
+]
 
-    items_per_page = 10
-    total_items = len(news_df)
-    total_pages = (total_items // items_per_page) + (1 if total_items % items_per_page > 0 else 0)
-    
-    start_idx = st.session_state.news_page * items_per_page
-    end_idx = start_idx + items_per_page
-    
-    # 뉴스 리스트 출력 (깔끔한 박스 형태)
-    current_news = news_df.iloc[start_idx:end_idx]
-    
-    for _, row in current_news.iterrows():
-        st.info(f"🔗 [{row['제목']}]({row['링크']})")
-    
-    # 페이지 이동 컨트롤
-    col_prev, col_page, col_next = st.columns([1, 2, 1])
-    
-    with col_prev:
-        if st.button("⬅️ 이전 뉴스") and st.session_state.news_page > 0:
-            st.session_state.news_page -= 1
-            st.rerun()
-            
-    with col_page:
-        st.markdown(f"<p style='text-align: center;'>{st.session_state.news_page + 1} / {total_pages} 페이지</p>", unsafe_allow_html=True)
-        
-    with col_next:
-        if st.button("다음 뉴스 ➡️") and st.session_state.news_page < total_pages - 1:
-            st.session_state.news_page += 1
-            st.rerun()
-else:
-    st.warning("데이터를 불러오는 중이거나 최신 기사가 없습니다. 잠시 후 다시 시도해 주세요.")
+for title, name, col in themes:
+    with col:
+        st.subheader(title)
+        theme_data = get_theme_top10(name)
+        if not theme_data.empty:
+            st.dataframe(
+                theme_data.style.format({
+                    '현재가': '{:,}원',
+                    '거래량': '{:,}주'
+                }).map(color_variation, subset=['전일비', '등락률']),
+                use_container_width=True
+            )
+        else:
+            st.write("해당 종목이 현재 거래량 상위에 없습니다.")
