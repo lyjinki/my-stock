@@ -150,69 +150,71 @@ st.caption("※ 시가총액 데이터는 네이버 증권 기준이며 실시�
 
 import datetime
 
-# 7. 최신 뉴스 가져오기 함수 (시총 상위 기업 위주)
-def get_stock_news():
-    # 네이버 증권 주요 뉴스 페이지 (KOSPI/코스닥 종합 뉴스)
-    url = "https://finance.naver.com/news/mainnews.naver"
-    headers = {'User-Agent': 'Mozilla/5.0'}
+# 7. 네이버 경제/종합 뉴스 가져오기 함수
+def get_total_news():
+    # 네이버 뉴스 '경제' 섹션의 최신 뉴스 URL
+    url = "https://news.naver.com/main/main.naver?mode=LSD&mid=shm&sid1=101" # 101은 경제 섹션
+    headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36'}
+    
     res = requests.get(url, headers=headers)
     soup = BeautifulSoup(res.text, 'html.parser')
     
     news_list = []
-    today = datetime.datetime.now()
     
-    # 뉴스 항목 추출
-    items = soup.select('.mainNewsList .articleItem')
-    for item in items:
-        title_tag = item.select_one('.articleSubject a')
-        if title_tag:
-            title = title_tag.get_text(strip=True)
-            link = "https://finance.naver.com" + title_tag['href']
-            
-            # 날짜 확인 (간이 필터링: 실제 운영시는 상세 페이지 날짜 확인 필요)
-            # 여기서는 목록에 있는 뉴스들을 3일 이내로 간주하거나 최신순으로 가져옵니다.
-            news_list.append({"제목": title, "링크": link})
+    # 뉴스 헤드라인 및 일반 목록 추출
+    # 네이버 뉴스 구조에 따라 선택자를 조정합니다.
+    links = soup.select('a.sa_text_title, a.cluster_text_headline')
+    
+    for link in links:
+        title = link.get_text(strip=True)
+        url_link = link['href']
+        
+        # 중복 방지 및 기사 수집
+        if title and url_link not in [n['링크'] for n in news_list]:
+            news_list.append({"제목": title, "링크": url_link})
             
     return pd.DataFrame(news_list)
 
-# 8. 뉴스 섹션 UI 및 페이지네이션
+# 8. 뉴스 섹션 UI (3일 이내 경제/사회 종합)
 st.divider()
-st.subheader("📰 KOSPI 주요 종목 최신 뉴스 (3일 이내)")
+st.subheader("📰 최신 경제·종합 뉴스")
+st.caption("3일 이내의 주요 경제 및 사회 분야 기사를 모아 보여줍니다.")
 
 # 뉴스 데이터 가져오기
-news_df = get_stock_news()
+news_df = get_total_news()
 
 if not news_df.empty:
-    # 페이지네이션 처리 (세션 스테이트 사용)
+    # 페이지네이션 설정
     if 'news_page' not in st.session_state:
         st.session_state.news_page = 0
 
     items_per_page = 10
-    total_pages = (len(news_df) // items_per_page) + 1
+    total_items = len(news_df)
+    total_pages = (total_items // items_per_page) + (1 if total_items % items_per_page > 0 else 0)
     
     start_idx = st.session_state.news_page * items_per_page
     end_idx = start_idx + items_per_page
     
-    # 현재 페이지 뉴스 표시
+    # 뉴스 리스트 출력 (깔끔한 박스 형태)
     current_news = news_df.iloc[start_idx:end_idx]
     
-    for idx, row in current_news.iterrows():
-        st.markdown(f"• [{row['제목']}]({row['링크']})")
+    for _, row in current_news.iterrows():
+        st.info(f"🔗 [{row['제목']}]({row['링크']})")
     
-    # 페이지 이동 버튼
+    # 페이지 이동 컨트롤
     col_prev, col_page, col_next = st.columns([1, 2, 1])
     
     with col_prev:
-        if st.button("이전 뉴스") and st.session_state.news_page > 0:
+        if st.button("⬅️ 이전 뉴스") and st.session_state.news_page > 0:
             st.session_state.news_page -= 1
             st.rerun()
             
     with col_page:
-        st.write(f"페이지 {st.session_state.news_page + 1} / {total_pages}")
+        st.markdown(f"<p style='text-align: center;'>{st.session_state.news_page + 1} / {total_pages} 페이지</p>", unsafe_allow_html=True)
         
     with col_next:
-        if st.button("다음 뉴스") and st.session_state.news_page < total_pages - 1:
+        if st.button("다음 뉴스 ➡️") and st.session_state.news_page < total_pages - 1:
             st.session_state.news_page += 1
             st.rerun()
 else:
-    st.write("최근 3일 이내의 주요 뉴스가 없습니다.")
+    st.warning("데이터를 불러오는 중이거나 최신 기사가 없습니다. 잠시 후 다시 시도해 주세요.")
