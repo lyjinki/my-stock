@@ -89,3 +89,45 @@ st.dataframe(
     }).map(color_variation, subset=['전일비', '등락률']),
     use_container_width=True
 )
+# 5. KOSPI 시가총액 상위 20위 기업 데이터 가져오는 함수
+def get_kospi_top_20():
+    # 네이버 증권 시가총액 페이지 (KOSPI)
+    url = "https://finance.naver.com/sise/sise_market_sum.naver?&page=1"
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    res = requests.get(url, headers=headers)
+    soup = BeautifulSoup(res.text, 'html.parser')
+    
+    table = soup.select_one('table.type_2')
+    df = pd.read_html(str(table))[0]
+    
+    # 불필요한 행(구분선 등) 제거 및 상위 20개 추출
+    df = df.dropna(subset=['종목명']).head(20)
+    
+    # 숫자 데이터 정리
+    for col in ['현재가', '시가총액']:
+        # 시가총액은 단위가 커서 숫자로만 변환
+        df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0).astype(int)
+    
+    # 번호 재정렬
+    df = df.reset_index(drop=True)
+    df.index = df.index + 1
+    
+    # 필요한 열만 선택 (거래량 대신 시가총액 포함 가능)
+    return df[['종목명', '현재가', '전일비', '등락률', '시가총액']]
+
+# 6. KOSPI 상위 20위 섹션 UI 출력
+st.divider()
+st.subheader("🏆 KOSPI 시가총액 상위 20위 기업 상황")
+
+with st.spinner('상위 20위 기업 데이터를 불러오는 중...'):
+    top_20_data = get_kospi_top_20()
+    
+    st.dataframe(
+        top_20_data.style.format({
+            '현재가': '{:,}원',
+            '시가총액': '{:,}억'
+        }).map(color_variation, subset=['전일비', '등락률']),
+        use_container_width=True
+    )
+
+st.caption("※ 시가총액 데이터는 네이버 증권 기준이며 실시간 상황에 따라 변동될 수 있습니다.")
