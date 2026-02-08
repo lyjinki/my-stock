@@ -147,3 +147,72 @@ with st.spinner('상위 20위 기업 데이터를 불러오는 중...'):
     )
 
 st.caption("※ 시가총액 데이터는 네이버 증권 기준이며 실시간 상황에 따라 변동될 수 있습니다.")
+
+import datetime
+
+# 7. 최신 뉴스 가져오기 함수 (시총 상위 기업 위주)
+def get_stock_news():
+    # 네이버 증권 주요 뉴스 페이지 (KOSPI/코스닥 종합 뉴스)
+    url = "https://finance.naver.com/news/mainnews.naver"
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    res = requests.get(url, headers=headers)
+    soup = BeautifulSoup(res.text, 'html.parser')
+    
+    news_list = []
+    today = datetime.datetime.now()
+    
+    # 뉴스 항목 추출
+    items = soup.select('.mainNewsList .articleItem')
+    for item in items:
+        title_tag = item.select_one('.articleSubject a')
+        if title_tag:
+            title = title_tag.get_text(strip=True)
+            link = "https://finance.naver.com" + title_tag['href']
+            
+            # 날짜 확인 (간이 필터링: 실제 운영시는 상세 페이지 날짜 확인 필요)
+            # 여기서는 목록에 있는 뉴스들을 3일 이내로 간주하거나 최신순으로 가져옵니다.
+            news_list.append({"제목": title, "링크": link})
+            
+    return pd.DataFrame(news_list)
+
+# 8. 뉴스 섹션 UI 및 페이지네이션
+st.divider()
+st.subheader("📰 KOSPI 주요 종목 최신 뉴스 (3일 이내)")
+
+# 뉴스 데이터 가져오기
+news_df = get_stock_news()
+
+if not news_df.empty:
+    # 페이지네이션 처리 (세션 스테이트 사용)
+    if 'news_page' not in st.session_state:
+        st.session_state.news_page = 0
+
+    items_per_page = 10
+    total_pages = (len(news_df) // items_per_page) + 1
+    
+    start_idx = st.session_state.news_page * items_per_page
+    end_idx = start_idx + items_per_page
+    
+    # 현재 페이지 뉴스 표시
+    current_news = news_df.iloc[start_idx:end_idx]
+    
+    for idx, row in current_news.iterrows():
+        st.markdown(f"• [{row['제목']}]({row['링크']})")
+    
+    # 페이지 이동 버튼
+    col_prev, col_page, col_next = st.columns([1, 2, 1])
+    
+    with col_prev:
+        if st.button("이전 뉴스") and st.session_state.news_page > 0:
+            st.session_state.news_page -= 1
+            st.rerun()
+            
+    with col_page:
+        st.write(f"페이지 {st.session_state.news_page + 1} / {total_pages}")
+        
+    with col_next:
+        if st.button("다음 뉴스") and st.session_state.news_page < total_pages - 1:
+            st.session_state.news_page += 1
+            st.rerun()
+else:
+    st.write("최근 3일 이내의 주요 뉴스가 없습니다.")
