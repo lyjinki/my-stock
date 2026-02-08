@@ -63,7 +63,7 @@ with col1:
     )
 
 with col2:
-st.subheader("🚀 오늘의 상승률 TOP 10")
+    st.subheader("🚀 오늘의 상승률 TOP 10")
     
     # 1. 등락률에서 %와 +를 떼고 숫자로 변환 (정렬을 위해)
     chart_data = data.copy()
