@@ -56,12 +56,19 @@ with col2:
 # 하단 상세 테이블
 st.divider()
 st.subheader("📊 전체 종목 상세 보기")
-# 표를 보여주는 부분 (st.dataframe)
+# 색상을 입히는 함수 추가
+def color_variation(val):
+    if '+' in str(val):
+        return 'color: red'
+    elif '-' in str(val):
+        return 'color: blue'
+    return ''
+
+# 중복된 st.table은 지우고, 이 st.dataframe 하나만 남깁니다.
 st.dataframe(
     data.style.format({
         '현재가': '{:,}원', 
         '거래량': '{:,}주'
-    }), 
+    }).map(color_variation, subset=['등락률', '전일비']), # 색상 효과 추가
     use_container_width=True
 )
-st.table(data.iloc[10:20])
