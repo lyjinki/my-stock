@@ -63,22 +63,38 @@ with col1:
     )
 
 with col2:
-    st.subheader("🚀 오늘의 상승률 TOP 10")
-    
-    # 1. 등락률에서 %와 +를 떼고 숫자로 변환 (정렬을 위해)
-    chart_data = data.copy()
-    chart_data['등락률_숫자'] = chart_data['등락률'].str.replace('%','').str.replace('+','').astype(float)
-    
-    # 2. 등락률이 높은 순서대로 정렬하고 상위 10개만 추출
-    top_10_rising = chart_data.sort_values(by='등락률_숫자', ascending=False).head(10)
-    
-    # 3. 차트 그리기 (상승률 순서대로)
-    st.bar_chart(top_10_rising.set_index('종목명')['등락률_숫자'], color="#ff4b4b")
-    
-    # 4. 분석 코멘트
-    top_theme = top_10_rising.iloc[0]['종목명']
-    st.success(f"현재 **{top_theme}** 종목이 가장 높은 상승률을 기록하며 시장을 이끌고 있습니다.")
+# 1. KOSPI 상승률 상위 기업 데이터를 가져오는 별도의 로직
+    def get_top_rising_companies():
+        url = "https://finance.naver.com/sise/sise_high_up.naver?sosok=0" # KOSPI(0) 상승률 상위
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        res = requests.get(url, headers=headers)
+        soup = BeautifulSoup(res.text, 'html.parser')
+        
+        # 상승률 상위 테이블 추출
+        table = soup.select_one('table.type_2')
+        df = pd.read_html(str(table))[0]
+        
+        # 빈 줄 및 불필요한 행 제거
+        df = df.dropna(subset=['종목명']).head(10)
+        
+        # 등락률에서 %와 + 제거 후 숫자로 변환
+        df['등락률_숫자'] = df['등락률'].str.replace('%','').str.replace('+','', regex=False).astype(float)
+        return df
 
+    # 데이터 호출
+    try:
+        top_rising_df = get_top_rising_companies()
+        
+        # 2. 차트 그리기 (막대 그래프)
+        st.bar_chart(top_rising_df.set_index('종목명')['등락률_숫자'], color="#ff4b4b")
+        
+        # 3. 1위 기업 강조
+        top_company = top_rising_df.iloc[0]['종목명']
+        top_percent = top_rising_df.iloc[0]['등락률']
+        st.success(f"현재 KOSPI에서 **{top_company}** 기업이 **{top_percent}**로 가장 높게 상승하고 있습니다.")
+        
+    except Exception as e:
+        st.error("상승률 데이터를 가져오는 중 오류가 발생했습니다.")
 # 하단 상세 테이블
 st.divider()
 st.subheader("📊 전체 종목 상세 보기")
