@@ -56,7 +56,6 @@ with col2:
 # 하단 상세 테이블
 st.divider()
 st.subheader("📊 전체 종목 상세 보기")
-st.table(data.iloc[10:20])
 # 표를 보여주는 부분 (st.dataframe)
 st.dataframe(
     data.style.format({
@@ -65,3 +64,4 @@ st.dataframe(
     }), 
     use_container_width=True
 )
+st.table(data.iloc[10:20])
