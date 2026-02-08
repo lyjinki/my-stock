@@ -16,8 +16,13 @@ def get_naver_stock_data():
     
     # 1. 빈 줄 삭제
     df = df.dropna(subset=['종목명'])
+
+    # 2. 숫자 데이터 깔끔하게 정리 (콤마 제거 및 정수 변환)
+    # 현재가, 거래량 등에서 소수점을 없앱니다.
+    for col in ['현재가', '거래량']:
+        df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0).astype(int)
     
-    # 2. 번호 재정렬 (이 부분을 추가하세요!)
+    # 3. 번호 재정렬 (이 부분을 추가하세요!)
     df = df.reset_index(drop=True)
     df.index = df.index + 1
     
@@ -52,3 +57,11 @@ with col2:
 st.divider()
 st.subheader("📊 전체 종목 상세 보기")
 st.table(data.iloc[10:20])
+# 표를 보여주는 부분 (st.dataframe)
+st.dataframe(
+    data.style.format({
+        '현재가': '{:,}원', 
+        '거래량': '{:,}주'
+    }), 
+    use_container_width=True
+)
