@@ -6,19 +6,21 @@ import time
 
 # 1. 네이버 증권 데이터 크롤링 함수
 def get_naver_stock_data():
-    # 예시: 네이버 증권의 '거래상위' 종목을 가져옵니다. 
-    # 실제 구현 시에는 테마별 URL(sise_group.naver?type=theme)을 사용하면 됩니다.
     url = "https://finance.naver.com/sise/sise_quant.naver"
     headers = {'User-Agent': 'Mozilla/5.0'}
     res = requests.get(url, headers=headers)
     soup = BeautifulSoup(res.text, 'html.parser')
     
-    # 테이블 파싱
     table = soup.select_one('table.type_2')
     df = pd.read_html(str(table))[0]
     
-    # 데이터 정리 (NaN 제거 및 불필요한 행 삭제)
+    # 1. 빈 줄 삭제
     df = df.dropna(subset=['종목명'])
+    
+    # 2. 번호 재정렬 (이 부분을 추가하세요!)
+    df = df.reset_index(drop=True)
+    df.index = df.index + 1
+    
     return df[['종목명', '현재가', '전일비', '등락률', '거래량']]
 
 # 2. Streamlit UI 설정
