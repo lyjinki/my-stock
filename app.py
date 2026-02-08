@@ -1,0 +1,52 @@
+import streamlit as st
+import requests
+from bs4 import BeautifulSoup
+import pandas as pd
+import time
+
+# 1. 네이버 증권 데이터 크롤링 함수
+def get_naver_stock_data():
+    # 예시: 네이버 증권의 '거래상위' 종목을 가져옵니다. 
+    # 실제 구현 시에는 테마별 URL(sise_group.naver?type=theme)을 사용하면 됩니다.
+    url = "https://finance.naver.com/sise/sise_quant.naver"
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    res = requests.get(url, headers=headers)
+    soup = BeautifulSoup(res.text, 'html.parser')
+    
+    # 테이블 파싱
+    table = soup.select_one('table.type_2')
+    df = pd.read_html(str(table))[0]
+    
+    # 데이터 정리 (NaN 제거 및 불필요한 행 삭제)
+    df = df.dropna(subset=['종목명'])
+    return df[['종목명', '현재가', '전일비', '등락률', '거래량']]
+
+# 2. Streamlit UI 설정
+st.set_page_config(page_title="KOSPI 테마별 분석 대시보드", layout="wide")
+
+st.title("📈 KOSPI 이슈별 실시간 투자 분석")
+st.markdown(f"**마지막 업데이트:** {time.strftime('%Y-%m-%d %H:%M:%S')}")
+
+# 새로고침 버튼
+if st.button('🔄 데이터 새로고침'):
+    st.rerun()
+
+# 3. 레이아웃 구성
+col1, col2 = st.columns(2)
+
+with col1:
+    st.subheader("🔥 현재 급상승 테마")
+    # 실제로는 크롤링 시 테마 카테고리를 분류하여 표시합니다.
+    data = get_naver_stock_data()
+    st.dataframe(data.head(10), use_container_width=True)
+
+with col2:
+    st.subheader("💡 분야별 투자 포인트")
+    st.info("현재 **AI 반도체**와 **자율주행** 분야가 뉴스 언급량이 많습니다.")
+    # 간단한 가상 차트나 요약 정보를 넣을 수 있습니다.
+    st.line_chart(data['등락률'].str.replace('%','').astype(float).head(10))
+
+# 하단 상세 테이블
+st.divider()
+st.subheader("📊 전체 종목 상세 보기")
+st.table(data.iloc[10:20])
