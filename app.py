@@ -4,13 +4,15 @@ from bs4 import BeautifulSoup
 import pandas as pd
 import time
 
-# 1. 투자 집중 종목 리스트 (정확한 명칭 사용)
-WATCH_LIST = [
-    "삼성전자", "대한전선", "한화", "삼성전기", 
-    "SK하이닉스", "한화에어로스페이스", "두산에너빌리티", "현대차", "한화오션"
-]
+# 1. 보유 종목 설정 (종목명: [매수가, 수량])
+MY_STOCKS = {
+    "대한전선": [33750, 223],
+    "삼성전자": [189700, 10]
+}
 
-# 2. 개별 종목 데이터 크롤링 함수
+# 관심 종목 리스트 (나머지 종목)
+WATCH_LIST = ["한화", "삼성전기", "SK하이닉스", "한화에어로스페이스", "두산에너빌리티", "현대차", "한화오션"]
+
 def get_specific_stock_data(item_name):
     search_url = f"https://finance.naver.com/search/searchList.naver?query={item_name}"
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
@@ -38,11 +40,84 @@ def get_specific_stock_data(item_name):
             "종목명": item_name,
             "현재가": int(price),
             "전일비": f"{prefix}{change}",
-            "등락률": f"{prefix}{rate}%",
-            "등락률_숫자": float(rate) * (1 if prefix == "+" else -1)
+            "등락률": f"{prefix}{rate}%"
         }
     except:
         return None
+
+def color_variation(val):
+    if isinstance(val, str):
+        if '+' in val: return 'color: #ff4b4b'
+        elif '-' in val: return 'color: #3133ff'
+    elif isinstance(val, (int, float)):
+        if val > 0: return 'color: #ff4b4b'
+        elif val < 0: return 'color: #3133ff'
+    return ''
+
+st.set_page_config(page_title="이家 주식분석 대시보드", layout="wide")
+st.title("📈 이家 주식투자 보유 현황 및 분석")
+
+if st.button('🔄 데이터 새로고침'):
+    st.rerun()
+
+# --- 섹션 1: 보유 종목 실시간 수익률 ---
+st.subheader("💰 나의 보유 종목 현황")
+
+my_results = []
+with st.spinner('보유 종목 데이터를 불러오는 중...'):
+    for name, info in MY_STOCKS.items():
+        data = get_specific_stock_data(name)
+        if data:
+            buy_price = info[0]
+            count = info[1]
+            current_price = data['현재가']
+            
+            # 수익률 계산
+            profit_loss = (current_price - buy_price) * count
+            profit_rate = ((current_price / buy_price) - 1) * 100
+            
+            data.update({
+                "매수가": buy_price,
+                "수량": count,
+                "평가손익": profit_loss,
+                "수익률": round(profit_rate, 2)
+            })
+            my_results.append(data)
+
+if my_results:
+    my_df = pd.DataFrame(my_results)
+    # 컬럼 순서 재배치
+    display_cols = ['종목명', '현재가', '매수가', '수량', '평가손익', '수익률', '등락률']
+    st.dataframe(
+        my_df[display_cols].style.format({
+            '현재가': '{:,}원', '매수가': '{:,}원', '수량': '{:,}주', 
+            '평가손익': '{:,}원', '수익률': '{:.2f}%'
+        }).map(color_variation, subset=['평가손익', '수익률', '등락률']),
+        use_container_width=True
+    )
+    
+    # 총 보유 자산 요약
+    total_profit = my_df['평가손익'].sum()
+    st.metric("총 평가 손익", f"{total_profit:,}원", delta=f"{total_profit:,}원")
+else:
+    st.warning("보유 종목 데이터를 불러오지 못했습니다.")
+
+# --- 섹션 2: 기타 관심 종목 ---
+st.divider()
+st.subheader("👀 기타 관심 종목 리스트")
+
+watch_results = []
+for stock in WATCH_LIST:
+    data = get_specific_stock_data(stock)
+    if data:
+        watch_results.append(data)
+
+if watch_results:
+    watch_df = pd.DataFrame(watch_results)
+    st.dataframe(
+        watch_df.style.format({'현재가': '{:,}원'}).map(color_variation, subset=['전일비', '등락률']),
+        use_container_width=True
+    )
 
 # 3. KOSPI 시총 상위 20위 크롤링 함수
 def get_kospi_top_20():
